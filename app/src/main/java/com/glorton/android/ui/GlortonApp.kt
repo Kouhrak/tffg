@@ -1,0 +1,43 @@
+package com.glorton.android.ui
+
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewmodel.compose.viewModel
+
+private enum class AppScreen { MENU, GAME }
+
+/** Root composable: navigation between the menu and the game (v1). */
+@Composable
+fun GlortonApp() {
+    MaterialTheme(colorScheme = darkColorScheme()) {
+        var screen by remember { mutableStateOf(AppScreen.MENU) }
+        val gameViewModel: GameViewModel = viewModel()
+
+        when (screen) {
+            AppScreen.MENU -> MainMenuScreen(
+                onPlay = {
+                    gameViewModel.onIntent(GameIntent.StartMatch)
+                    screen = AppScreen.GAME
+                },
+            )
+            AppScreen.GAME -> {
+                val gameState by gameViewModel.uiState.collectAsState()
+                GameScreen(
+                    state = gameState,
+                    onIntent = { intent ->
+                        gameViewModel.onIntent(intent)
+                        if (intent is GameIntent.ExitToMenu) {
+                            screen = AppScreen.MENU
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
