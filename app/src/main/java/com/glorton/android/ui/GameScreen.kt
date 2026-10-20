@@ -3,6 +3,7 @@ package com.glorton.android.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -75,10 +76,17 @@ fun GameScreen(
             }
 
             snapshot.gameOverText?.let { text ->
-                CenterBanner(
-                    text = text,
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.align(Alignment.Center),
-                )
+                ) {
+                    CenterBanner(text = text)
+                    // frame_51 waits for the player; here a button opens the
+                    // frame_170 results table.
+                    TextButton(onClick = { onIntent(GameIntent.ShowResults) }) {
+                        Text(text = "RESULTS", color = Color.White)
+                    }
+                }
             }
 
             if (state.isPaused) {

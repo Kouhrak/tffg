@@ -28,6 +28,8 @@ sealed interface GameIntent {
     data class StartMatch(val fighterId: String = "DefaultPlayer") : GameIntent
     data object TogglePause : GameIntent
     data object ExitToMenu : GameIntent
+    /** Shows the frame_170 results screen after GAME SET (navigation only). */
+    data object ShowResults : GameIntent
     data class UpdateInput(val input: InputState) : GameIntent
 }
 
@@ -60,6 +62,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             is GameIntent.StartMatch -> startMatch(intent.fighterId)
             GameIntent.TogglePause -> togglePause()
             GameIntent.ExitToMenu -> exitToMenu()
+            // Navigation-only: GlortonApp switches to the results screen; the
+            // standings travel inside the last published GameSnapshot.
+            GameIntent.ShowResults -> Unit
             is GameIntent.UpdateInput -> inputFlow.update { intent.input }
         }
     }
