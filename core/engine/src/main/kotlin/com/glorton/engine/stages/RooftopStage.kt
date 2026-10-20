@@ -28,12 +28,12 @@ object RooftopStage {
             Platform("FixedRoofC", PlatformType.FIXED, x = 385f, y = 100f, width = 230f, height = 30f),
         )
         val spawns = mapOf(
+            // frame_51 InitArea attaches players at SpawnP1..SpawnP4; the
+            // original rects live in the SWF stage timeline - approximations.
             "SpawnP1" to PointF(235f, 260f),
             "SpawnP2" to PointF(765f, 260f),
-            "SpawnH1" to PointF(235f, 150f),
-            "SpawnH2" to PointF(500f, 60f),
-            "SpawnH3" to PointF(765f, 150f),
-            "SpawnH4" to PointF(500f, 260f),
+            "SpawnP3" to PointF(235f, 150f),
+            "SpawnP4" to PointF(765f, 150f),
         )
         // AS2 SpawnH1..SpawnH4 bars (item drop zones). The real rects live in
         // the SWF stage timeline; these are approximations around the

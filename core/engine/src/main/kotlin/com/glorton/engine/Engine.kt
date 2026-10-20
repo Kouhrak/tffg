@@ -79,7 +79,33 @@ data class GameSnapshot(
     val projectiles: List<ProjectileSnapshot>,
     val explosions: List<ExplosionSnapshot>,
     val gameOverText: String?,
+    /**
+     * frame_101/frame_143 standings consumed by the results screen
+     * (frame_170 table); empty until the match ends.
+     */
+    val standings: List<StandingSnapshot> = emptyList(),
+    /** `"stock"` or `"time"` - selects the frame_170 legend and columns. */
+    val limitMode: String = "stock",
     val nowMs: Float,
+)
+
+/**
+ * Read-only standings row for one player: the frame_170 results table
+ * (frame_143 Rank over frame_101's sorted BestPlayers).
+ */
+data class StandingSnapshot(
+    /** AS2 `Game.Players` index (0-based; "P1" is index 0). */
+    val playerIndex: Int,
+    val fighterId: String,
+    val colr: String,
+    /** frame_143: `Game.Players[Ind].Rank = i + 1` over the sorted list. */
+    val rank: Int,
+    val kos: Int,
+    val deaths: Int,
+    /** AS2 `SDs` - deaths without an attacker (stock legend: "Suicides"). */
+    val sds: Int,
+    /** frame_101 Score: time -> KOs - Deaths; stock -> DeathOrd (NumDead for survivors). */
+    val score: Int,
 )
 
 /**
@@ -129,8 +155,11 @@ class Engine(
     var gameOverText: String? = null
         private set
 
+    /** Standings computed at endGame (frame_101/frame_143); empty before that. */
+    var standings: List<StandingSnapshot> = emptyList()
+        private set
+
     private var countdownAccMs = 0f
-    private var nextDeathOrd = 0
 
     /** One 25ms logic tick. [inputs] is one InputState per human player. */
     fun tick(inputs: List<InputState>) {
@@ -214,30 +243,55 @@ class Engine(
     }
 
     /**
-     * Port of the winner computation of frame_170/frame_49: time mode ranks by
-     * KOs - Deaths, stock mode by DeathOrd (players who never died get the
-     * highest value, so the survivor wins).
+     * Port of the end-game results: frame_101 (BestPlayers + WinnerText),
+     * frame_143 (Rank = position in that order) and frame_170 (table rows the
+     * app's results screen renders). The winner line text is frame_101's
+     * `"PLAYER {BestPlayers[0].Index + 1} WINS!"` for both limit modes.
      */
     private fun endGame() {
         sound.stopAll()
         phase = Phase.GAMESET
-        gameOverText = if (limitMode == "time") {
-            val winner = fighters.withIndex().maxBy { (i, f) ->
-                (f.kos - f.deaths).toFloat().let { score -> score * 1000f - i }
-            }
-            "PLAYER ${winner.index + 1} WINS!"
-        } else {
-            val ranked = fighters.withIndex()
-                .sortedBy { (_, f) -> f.rankingDeathOrd() }
-            "PLAYER ${ranked.last().index + 1} WINS!"
-        }
+        standings = computeStandings()
+        gameOverText = "PLAYER ${standings.first().playerIndex + 1} WINS!"
     }
 
-    /** Registers a death order for the stock ranking (AS2 NumDead/DeathOrd). */
-    fun noteDeath(fighter: Fighter) {
-        if (fighter.deathOrd < 0) {
-            fighter.deathOrd = nextDeathOrd++
+    /**
+     * Port of frame_101's BestPlayers sort + frame_143's Rank assignment:
+     *  - time mode: Score = KOs - Deaths;
+     *  - stock mode: Score = DeathOrd, where a player who never died
+     *    (`deathOrd == -1`, the AS2 `DeathOrd == undefined`) takes NumDead
+     *    (frame_101: `Game.Players[i].DeathOrd = NumDead`) - the highest
+     *    possible value, so every survivor ranks above every dead player.
+     *
+     * Sorted descending; equal scores keep ascending player-index order: the
+     * AS2 `sortOn("Score", DESCENDING)` runs over the input array and the port
+     * assumes input-order stability among ties, so the lowest player number
+     * wins (documented assumption - AVM1 sort stability is unspecified).
+     */
+    internal fun computeStandings(): List<StandingSnapshot> {
+        val numDead = fighters.count { it.dead }
+        fun scoreOf(f: Fighter): Int = when {
+            limitMode == "time" -> f.kos - f.deaths
+            f.deathOrd >= 0 -> f.deathOrd
+            else -> numDead
         }
+        return fighters.withIndex()
+            .sortedWith(
+                compareByDescending<IndexedValue<Fighter>> { (_, f) -> scoreOf(f) }
+                    .thenBy { it.index }
+            )
+            .mapIndexed { position, (index, f) ->
+                StandingSnapshot(
+                    playerIndex = index,
+                    fighterId = f.fighterId,
+                    colr = f.colr,
+                    rank = position + 1,
+                    kos = f.kos,
+                    deaths = f.deaths,
+                    sds = f.sds,
+                    score = scoreOf(f),
+                )
+            }
     }
 
     fun snapshot(): GameSnapshot = GameSnapshot(
@@ -302,16 +356,8 @@ class Engine(
             )
         },
         gameOverText = gameOverText,
+        standings = standings,
+        limitMode = limitMode,
         nowMs = nowMs,
     )
-
-    companion object {
-        /**
-         * Stock-mode ranking treats a negative DeathOrd (player never died)
-         * as the highest possible order, matching frame_170 where survivors
-         * receive NumDead at the end.
-         */
-        internal fun Fighter.rankingDeathOrd(): Int =
-            if (deathOrd >= 0) deathOrd else Int.MAX_VALUE
-    }
 }

@@ -115,9 +115,11 @@ abstract class Fighter(
 
     /**
      * Port of AS2 field `DeathOrd` (`_parent.NumDead++` in Fighter.Die) - order of
-     * death within the match. Use [resetDeathOrder] at match start.
+     * death within the match. **-1 = never died** (AS2 `undefined`; frame_101
+     * substitutes NumDead at ranking time). [die] assigns the next order;
+     * reset to -1 when the match starts.
      */
-    var deathOrd: Int = 0
+    var deathOrd: Int = -1
 
     /** Port of AS2 field `SDs` - deaths without a last attacker (self destructs). */
     var sds: Int = 0
@@ -310,7 +312,8 @@ abstract class Fighter(
         deaths = 0
         sds = 0
         kos = 0
-        deathOrd = 0
+        // AS2: DeathOrd is undefined until the player dies.
+        deathOrd = -1
         combo = 2
         currentItem = ""
         currentItemObj = null
@@ -625,17 +628,29 @@ abstract class Fighter(
         paralyzedMs = 0f
         deaths += 1
         if (lives > 0 || limitMode == "time") {
+            // Respawn (AS2: Spawn(true) + PlayerDeath, called before the dead
+            // marking). Deviation from Fighter.as:486-491: the original sets
+            // `Dead = true` (and replaces the Players record with a dead
+            // snapshot) even when the fighter respawns, which would end every
+            // stock match on the first death. That literal code contradicts
+            // the game's own design: frame_101 checks `DeathOrd == undefined`
+            // for survivors (only meaningful if survivors stay alive), the
+            // stock lives widget defaults to 5, and OSD treats `Dead` as an
+            // off-screen-indicator kill switch. The port marks [dead] only on
+            // elimination, so stock mode plays as the designed multi-life mode.
             spawn(mkSpawn = true)
-            // AS2: _parent.PlayerDeath() - first call, before Dead is set.
+        } else {
+            // Elimination: stock with no lives left (AS2 would fall through to
+            // `Dead = true; HasControl = false; DeathOrd = NumDead++`).
+            dead = true
+            visible = false
+            hasControl = false
+            deathOrd = deathOrderCounter++ // AS2: DeathOrd = _parent.NumDead++
         }
         // AS2: VCam.FocusObjs.splice(CamIn, 1) - camera, omitted.
-        dead = true
-        visible = false
-        hasControl = false
-        deathOrd = deathOrderCounter++ // AS2: DeathOrd = _parent.NumDead++
-        // AS2 replaced _parent.Players[PlayNum] with a results snapshot
-        // {Deaths, SDs, KOs, Lives, DeathOrd, Dead, Depth} and called PlayerDeath()
-        // again - match bookkeeping belongs to the app layer.
+        // AS2 also wrote a Players snapshot {Deaths, SDs, KOs, Lives, DeathOrd,
+        // Dead, Depth} and called PlayerDeath(); here match bookkeeping lives
+        // in Engine.computeStandings instead.
     }
 
     /**
