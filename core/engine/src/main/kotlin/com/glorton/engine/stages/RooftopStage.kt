@@ -35,11 +35,21 @@ object RooftopStage {
             "SpawnH3" to PointF(765f, 150f),
             "SpawnH4" to PointF(500f, 260f),
         )
+        // AS2 SpawnH1..SpawnH4 bars (item drop zones). The real rects live in
+        // the SWF stage timeline; these are approximations around the
+        // placeholder SpawnH points - refine with DefineSprite_726_Rooftop.
+        val itemSpawns = listOf(
+            RectF(135f, 150f, 335f, 160f),
+            RectF(400f, 60f, 600f, 70f),
+            RectF(665f, 150f, 865f, 160f),
+            RectF(400f, 260f, 600f, 270f),
+        )
         return World(
             platforms = platforms,
             spawnPoints = spawns,
             bounds = bounds,
             camBounds = StageBounds.ROOFTOP.camBounds,
+            itemSpawns = itemSpawns,
         )
     }
 }

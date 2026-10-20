@@ -2,16 +2,20 @@ package com.glorton.engine
 
 import com.glorton.engine.ai.AIControl
 import com.glorton.engine.camera.VCamera
+import com.glorton.engine.fighter.AuberginePlayer
+import com.glorton.engine.fighter.CoffeePlayer
 import com.glorton.engine.fighter.DefaultPlayer
 import com.glorton.engine.fighter.Fighter
-import com.glorton.engine.fighter.FighterStats
+import com.glorton.engine.fighter.PeachPlayer
+import com.glorton.engine.fighter.SBLPlayer
+import com.glorton.engine.fighter.TrashPlayer
 import com.glorton.engine.input.InputMapper
 import com.glorton.engine.stages.RooftopStage
 import com.glorton.engine.world.World
 
 /** Declarative description of one slot of the match. */
 data class PlayerSpec(
-    /** Library link name of the fighter; only "DefaultPlayer" is wired in v1. */
+    /** Library link name of the fighter; any of the six ported ids (see GameFactory). */
     val fighterId: String = "DefaultPlayer",
     /** "red" | "blue" | "green" | "orange" (Colors list from frame_42). */
     val colr: String = "red",
@@ -26,16 +30,35 @@ data class PlayerSpec(
  */
 object GameFactory {
 
+    /**
+     * Ported roster in frame_46 order: `Fighters = [SBL, Peach, Trash, Coffee,
+     * Default, Aubergine]`. Mirrors `createFighter`; used by the app to offer
+     * character selection before the full frame_46 menu is ported.
+     */
+    val ROSTER = listOf(
+        "SBLPlayer",
+        "PeachPlayer",
+        "TrashPlayer",
+        "CoffeePlayer",
+        "DefaultPlayer",
+        "AuberginePlayer",
+    )
+
     fun rooftopMatch(
         players: List<PlayerSpec>,
         limitMode: String = "stock",
         limitVal: Int = 3,
+        /** AS2 Settings.ItemFrequency (frame_42 default 3; 0 disables item drops). */
+        itemFrequency: Int = 3,
         sound: SoundSink = NoopSoundSink,
     ): Engine {
         val world: World = RooftopStage.create()
         val camera = VCamera().apply {
             boundsCam = world.camBounds
         }
+        // AS2 Snd is a global singleton; entities without a fighter reference
+        // (items, explosions) reach it through World.sound.
+        world.sound = sound
 
         val fighters = mutableListOf<Fighter>()
         val ais = mutableListOf<AIControl?>()
@@ -82,6 +105,9 @@ object GameFactory {
         // frame_51: Snd.PlaySound(Game.Level, true) — looped stage music.
         sound.play("Rooftop", loop = true)
 
+        // frame_51 InitArea: ItemGen.init([Mine,Grenade], Settings.ItemFrequency).
+        val itemGen = com.glorton.engine.item.ItemGen(world = world, frequency = itemFrequency)
+
         return Engine(
             world = world,
             camera = camera,
@@ -89,6 +115,7 @@ object GameFactory {
             fighters = fighters,
             ais = ais,
             inputMappers = mappers,
+            itemGen = itemGen,
             limitMode = limitMode,
             limitVal = limitVal,
         )
@@ -96,13 +123,39 @@ object GameFactory {
 
     private fun createFighter(index: Int, spec: PlayerSpec, sound: SoundSink): Fighter =
         when (spec.fighterId) {
-            // TODO: wire the remaining fighters as they are ported
-            // (SBLPlayer, PeachPlayer, TrashPlayer, CoffeePlayer, AuberginePlayer).
+            "SBLPlayer" -> SBLPlayer(
+                playNum = index,
+                fighterId = spec.fighterId,
+                sound = sound,
+            )
+            "PeachPlayer" -> PeachPlayer(
+                playNum = index,
+                fighterId = spec.fighterId,
+                sound = sound,
+            )
+            "TrashPlayer" -> TrashPlayer(
+                playNum = index,
+                fighterId = spec.fighterId,
+                sound = sound,
+            )
+            "CoffeePlayer" -> CoffeePlayer(
+                playNum = index,
+                fighterId = spec.fighterId,
+                sound = sound,
+            )
+            "AuberginePlayer" -> AuberginePlayer(
+                playNum = index,
+                fighterId = spec.fighterId,
+                sound = sound,
+            )
             "DefaultPlayer" -> DefaultPlayer(
                 playNum = index,
                 fighterId = spec.fighterId,
                 sound = sound,
             )
+            // Roster from frame_46: Fighters = [SBL, Peach, Trash, Coffee,
+            // Default, Aubergine] - all six are ported. Unknown ids fall back
+            // to DefaultPlayer so a bad spec never kills the match.
             else -> DefaultPlayer(
                 playNum = index,
                 fighterId = spec.fighterId,

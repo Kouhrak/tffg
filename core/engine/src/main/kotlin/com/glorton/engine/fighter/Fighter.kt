@@ -646,6 +646,9 @@ abstract class Fighter(
      * @param kind library link name, e.g. `"EnergyBall"`.
      * @param xScalePct AS2 `_xscale` (sign mirrors the facing, `-50..50`).
      * @param yScalePct AS2 `_yscale`.
+     * @param variant AS2 extra `.init(...)` argument where the original passes a
+     *   visual frame of the attack clip (Garbage's `Type`); 0 for projectiles
+     *   that take none.
      */
     open fun spawnProjectile(
         kind: String,
@@ -656,6 +659,7 @@ abstract class Fighter(
         xInc: Float = 0f,
         yInc: Float = 0f,
         rotDeg: Float = 0f,
+        variant: Int = 0,
     ) {
         // Default: no-op (AS2 base class spawns nothing).
     }

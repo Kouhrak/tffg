@@ -74,6 +74,12 @@ class World(
     val spawnPoints: Map<String, PointF>,
     val bounds: RectF,
     val camBounds: RectF,
+    /**
+     * Horizontal spawn bars for the item generator (AS2 `SpawnH1..SpawnH4`
+     * MovieClips: x = bar.x + random(bar.width), y = bar.y). A list of rects
+     * instead of points because the width participates in the spawn roll.
+     */
+    val itemSpawns: List<RectF> = emptyList(),
 ) {
     val players = mutableListOf<Fighter>()
     val items = mutableListOf<com.glorton.engine.item.Item>()
@@ -86,6 +92,13 @@ class World(
      * camera-free.
      */
     var camera: VCamera? = null
+
+    /**
+     * Global sound channel (AS2's singleton `Snd`); wired by GameFactory so
+     * entities created without a fighter reference (items, explosions) can
+     * play. Optional so plain-World tests stay silent.
+     */
+    var sound: com.glorton.engine.SoundSink? = null
 
     fun addPlayer(player: Fighter) {
         players.add(player)

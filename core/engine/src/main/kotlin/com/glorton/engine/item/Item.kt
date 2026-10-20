@@ -1,7 +1,9 @@
 package com.glorton.engine.item
 
 import com.glorton.engine.GameConfig
+import com.glorton.engine.NoopSoundSink
 import com.glorton.engine.RectF
+import com.glorton.engine.SoundSink
 import com.glorton.engine.fighter.Fighter
 import com.glorton.engine.world.Body
 import com.glorton.engine.world.CollisionResult
@@ -103,6 +105,14 @@ abstract class Item(
         }
         y += yInc
     }
+
+    /**
+     * Global sound channel of the match (AS2 code calls the singleton
+     * `Snd.PlaySound` directly, e.g. Mine's "MineActivate" and the Boom played
+     * by every [Explosion]). Wired by GameFactory like `World.camera`.
+     */
+    protected val worldSound: SoundSink
+        get() = worldObj.sound ?: NoopSoundSink
 
     /** Port of Item.Throw (Item.as). Angle in degrees; negative angles mirror to 180+angle. */
     fun doThrow(power: Float, angleDeg: Float) {

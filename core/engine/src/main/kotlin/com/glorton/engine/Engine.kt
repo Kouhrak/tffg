@@ -101,6 +101,8 @@ class Engine(
     private val fighters: List<Fighter>,
     private val ais: List<AIControl?>,
     private val inputMappers: List<InputMapper?>,
+    /** frame_51 `ItemGen` cadence; null when the stage has no item spawn bars. */
+    val itemGen: com.glorton.engine.item.ItemGen? = null,
     val limitMode: String,
     var limitVal: Int,
 ) {
@@ -160,6 +162,11 @@ class Engine(
             for (item in world.items.toList()) {
                 item.doItemTick()
             }
+            // frame_51 InitArea: ItemGen.init([Mine,Grenade], Settings.ItemFrequency).
+            // Tick placement inside FIGHT (documented): the AS2 interval also runs
+            // during the countdown, but items do not tick during the countdown in
+            // this port, so spawning there would freeze them mid-air.
+            itemGen?.tick()
             for (projectile in world.projectiles.toList()) {
                 projectile.tick()
             }

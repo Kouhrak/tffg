@@ -248,6 +248,7 @@ class DefaultPlayer(
         xInc: Float,
         yInc: Float,
         rotDeg: Float,
+        variant: Int,
     ) {
         if (kind != "EnergyBall") return
         val ball = EnergyBall(
