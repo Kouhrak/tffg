@@ -17,12 +17,15 @@ private enum class AppScreen { MENU, GAME }
 fun GlortonApp() {
     MaterialTheme(colorScheme = darkColorScheme()) {
         var screen by remember { mutableStateOf(AppScreen.MENU) }
+        var selectedFighterId by remember { mutableStateOf("DefaultPlayer") }
         val gameViewModel: GameViewModel = viewModel()
 
         when (screen) {
             AppScreen.MENU -> MainMenuScreen(
+                selectedFighterId = selectedFighterId,
+                onSelectFighter = { selectedFighterId = it },
                 onPlay = {
-                    gameViewModel.onIntent(GameIntent.StartMatch)
+                    gameViewModel.onIntent(GameIntent.StartMatch(fighterId = selectedFighterId))
                     screen = AppScreen.GAME
                 },
             )

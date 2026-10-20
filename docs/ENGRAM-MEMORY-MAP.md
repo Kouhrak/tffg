@@ -156,8 +156,15 @@ logs; retrieve any of them with `mem_get_observation(id)` when needed.
 
 - User-reported controller/touch issues (details pending) — next session topic.
 - Rooftop platform geometry in `RooftopStage.kt` is an approximation; real
-  geometry lives in the SWF sprite `DefineSprite_726_Rooftop`.
+  geometry lives in the SWF sprite `DefineSprite_726_Rooftop` (SpawnH1..4 item
+  bars are approximations too, see `RooftopStage.itemSpawns`).
 - Sounds `Fart.wav` and `PeachRocket.wav` exported by JPEXS as Flash-ADPCM FLV,
-  not convertible here; Fart falls back to Fart2, Rocket comes with PeachPlayer.
-- Remaining fighters (SBL, Peach, Trash, Coffee, Aubergine), items (Mine, Grenade),
-  menus/endurance, sprite extraction, WiFi LAN multiplayer.
+  not convertible here (no ffmpeg available); Fart falls back to Fart2, and
+  "Rocket" (Peach's up-special, now ported) still plays silently in
+  AndroidSoundSink — needs a converted asset.
+- Star is ported but **dormant**: no decompiled script spawns it
+  (`frame_51` passes only `["Mine","Grenade"]` to ItemGen, no
+  `attachMovie("Star")` exists) — investigate the SWF timeline actions.
+- `ItemIndicator` (AS2 root-level marker above items, synced to visibility)
+  is not ported — renderer has no equivalent; visual aid only.
+- Menus/endurance modes, sprite extraction, WiFi LAN multiplayer.

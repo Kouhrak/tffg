@@ -165,18 +165,28 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawWorld(
         )
     }
 
-    // Items: gold diamond for the Star (only item ported so far).
+    // Items: diamond placeholders keyed by item name, rotating like the SWF
+    // clips (the Mine turns when sticking, the Grenade spins in the air).
+    val itemColors = mapOf(
+        "star" to Color(0xFFFFD54F),
+        "mine" to Color(0xFFE53935),
+        "grenade" to Color(0xFF43A047),
+    )
     for (item in snapshot.items) {
         if (!item.visible) continue
         val half = item.width / 2f
-        val path = Path().apply {
-            moveTo(sx(item.x), sy(item.y - half))
-            lineTo(sx(item.x + half), sy(item.y))
-            lineTo(sx(item.x), sy(item.y + half))
-            lineTo(sx(item.x - half), sy(item.y))
-            close()
+        val cx = sx(item.x)
+        val cy = sy(item.y)
+        withTransform({ rotate(item.rotationDeg, pivot = Offset(cx, cy)) }) {
+            val path = Path().apply {
+                moveTo(cx, cy - sh(half))
+                lineTo(cx + sw(half), cy)
+                lineTo(cx, cy + sh(half))
+                lineTo(cx - sw(half), cy)
+                close()
+            }
+            drawPath(path = path, color = itemColors[item.name] ?: Color.White)
         }
-        drawPath(path = path, color = Color(0xFFFFD54F))
     }
 
     // Projectiles: colored rotating rectangles keyed by class name.

@@ -24,7 +24,8 @@ import kotlinx.coroutines.launch
 
 /** MVI intents of the game screen. */
 sealed interface GameIntent {
-    data object StartMatch : GameIntent
+    /** Starts a match with [fighterId] chosen by P1 on the menu. */
+    data class StartMatch(val fighterId: String = "DefaultPlayer") : GameIntent
     data object TogglePause : GameIntent
     data object ExitToMenu : GameIntent
     data class UpdateInput(val input: InputState) : GameIntent
@@ -56,20 +57,23 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onIntent(intent: GameIntent) {
         when (intent) {
-            GameIntent.StartMatch -> startMatch()
+            is GameIntent.StartMatch -> startMatch(intent.fighterId)
             GameIntent.TogglePause -> togglePause()
             GameIntent.ExitToMenu -> exitToMenu()
             is GameIntent.UpdateInput -> inputFlow.update { intent.input }
         }
     }
 
-    private fun startMatch() {
+    private fun startMatch(fighterId: String) {
         stopLoop()
-        // V1 slice: P1 DefaultPlayer (red) vs CPU DefaultPlayer (blue).
+        // P1 picks the fighter on the menu; the CPU takes the first roster
+        // entry that differs, so any pick can be playtested against variety
+        // (the original assigns both fighters in frame_46 select).
+        val cpuFighterId = GameFactory.ROSTER.firstOrNull { it != fighterId } ?: fighterId
         val match = GameFactory.rooftopMatch(
             players = listOf(
-                PlayerSpec(fighterId = "DefaultPlayer", colr = "red", team = "red", ai = false),
-                PlayerSpec(fighterId = "DefaultPlayer", colr = "blue", team = "blue", ai = true, aiLevel = 7f),
+                PlayerSpec(fighterId = fighterId, colr = "red", team = "red", ai = false),
+                PlayerSpec(fighterId = cpuFighterId, colr = "blue", team = "blue", ai = true, aiLevel = 7f),
             ),
             limitMode = "stock",
             limitVal = 3,
