@@ -86,6 +86,12 @@ data class GameSnapshot(
     val standings: List<StandingSnapshot> = emptyList(),
     /** `"stock"` or `"time"` - selects the frame_170 legend and columns. */
     val limitMode: String = "stock",
+    /** AS2 `Game.Type`: `"versus"` or `"endurance"`. */
+    val gameType: String = "versus",
+    /** frame_51 `KilledPlayers` - enemies defeated in an endurance run. */
+    val killedPlayers: Int = 0,
+    /** frame_51 `GameTime` - elapsed whole seconds (endurance results clock). */
+    val gameTimeSec: Int = 0,
     val nowMs: Float,
 )
 
@@ -117,18 +123,27 @@ data class StandingSnapshot(
  *    DoFighter then DoAI, which delays AI commands by one 25ms tick.
  *  - The AS2 loop `while (_loc1_ <= NPlayers)` had an off-by-one that also
  *    ticked a phantom player; the port iterates exactly the real fighters.
- *  - Endurance mode regeneration and the menugame/tutorial flows are not
- *    ported yet (versus stock/time only).
+ *  - The menugame/tutorial attract flows are not ported yet; versus
+ *    (stock/time) and endurance modes are.
  */
 class Engine(
     val world: World,
     val camera: VCamera,
     private val sound: SoundSink,
-    private val fighters: List<Fighter>,
-    private val ais: List<AIControl?>,
+    private val fighters: MutableList<Fighter>,
+    /** AI driver per slot (null for human players); internal so tests can assert wave levels. */
+    internal val ais: MutableList<AIControl?>,
     private val inputMappers: List<InputMapper?>,
     /** frame_51 `ItemGen` cadence; null when the stage has no item spawn bars. */
     val itemGen: com.glorton.engine.item.ItemGen? = null,
+    /** AS2 `Game.Type`: `"versus"` (default) or `"endurance"`. */
+    val gameType: String = "versus",
+    /**
+     * Builds the next endurance wave's CPU fighter (AS2
+     * GenerateEndurancePlayer's `Fighters[random(...)]` attachMovie); null in
+     * versus mode. Apply team/lives/colr after [Fighter.init].
+     */
+    private val enemyFactory: (() -> Fighter)? = null,
     val limitMode: String,
     var limitVal: Int,
 ) {
@@ -158,6 +173,17 @@ class Engine(
     /** Standings computed at endGame (frame_101/frame_143); empty before that. */
     var standings: List<StandingSnapshot> = emptyList()
         private set
+
+    /** frame_51 `KilledPlayers`: enemies defeated during an endurance run. */
+    var killedPlayers: Int = 0
+        private set
+
+    /**
+     * frame_51 `EnduranceLevel`: wave number that scales the CPU AI level.
+     * Starts at 1 because GameFactory spawns wave 1 (AS2 InitArea already ran
+     * GenerateEndurancePlayer once, incrementing the counter from 0 to 1).
+     */
+    private var enduranceLevel = 1
 
     private var countdownAccMs = 0f
 
@@ -231,8 +257,24 @@ class Engine(
         }
     }
 
-    /** Port of PlayerDeath (frame_51), stock mode only for now. */
+    /**
+     * Port of PlayerDeath (frame_51): versus stock ends when all but one
+     * player are eliminated; endurance ends when P1 dies and regenerates the
+     * CPU wave otherwise (`GenerateEndurancePlayer`).
+     */
     private fun checkDeaths() {
+        if (gameType == "endurance") {
+            val p1 = fighters.first()
+            if (p1.dead) {
+                endGame()
+                return
+            }
+            val enemy = fighters.getOrNull(1)
+            if (enemy != null && enemy.dead) {
+                regenerateEnemy()
+            }
+            return
+        }
         if (limitMode != "stock") return
         val deadCount = fighters.count { it.dead }
         if (fighters.size == 1) {
@@ -241,6 +283,54 @@ class Engine(
             endGame()
         }
     }
+
+    /**
+     * Port of the replacement branch of frame_51 GenerateEndurancePlayer:
+     * count the kill, scale the AI level with the wave number and swap the
+     * CPU fighter for a fresh random roster fighter at SpawnP2 (y = 0).
+     */
+    private fun regenerateEnemy() {
+        killedPlayers++
+        enduranceLevel++
+        val old = fighters[1]
+        // AS2 removes the old Player2 clip + HitTester/FarInd/OSD graphics.
+        world.players.remove(old)
+        val enemy = enemyFactory?.invoke() ?: return
+        enemy.world = world
+        // AS2 replacement attachMovie: {_x: SpawnP2._x, _y: 0, PlayNum: 1}.
+        val spawnP2 = world.spawnPoints["SpawnP2"] ?: return
+        enemy.init(spawnP2.x, 0f)
+        enemy.colr = invertColr(fighters[0].colr) // AS2: red unless P1 is red -> blue
+        enemy.team = "blue" // AS2: Players[1].Team = "blue"
+        enemy.lives = 1 // AS2: Players[1].Lives = 1
+        enemy.limitMode = limitMode
+        world.addPlayer(enemy)
+        fighters[1] = enemy
+        // AS2 re-pushes the HitTester onto VCam.FocusObjs at the old depth.
+        val focusIndex = camera.focusObjs.indexOf(old)
+        if (focusIndex >= 0) {
+            camera.focusObjs[focusIndex] = enemy
+        } else {
+            camera.focusObjs.add(enemy)
+        }
+        // AS2 reuses Computers[0] and only updates Level/Victim/ForceVictim,
+        // which leaves `this.Player` pointing at the removed clip; the port
+        // builds a fresh AIControl for the new fighter so the wave actually
+        // fights (documented deviation).
+        val ai = AIControl(enemy, world)
+        ai.level = enduranceLevel.toFloat() // AS2: Computers[0].Level = EnduranceLevel
+        ai.forceVictim = true // AS2: Computers[0].ForceVictim = true
+        ai.victim = fighters[0] // AS2: Computers[0].Victim = Players[0]
+        if (ais.size > 1) {
+            ais[1] = ai
+        } else {
+            ais.add(ai)
+        }
+        // inputMappers[1] stays null: the wave is AI-driven.
+    }
+
+    /** AS2 GenerateEndurancePlayer: `_loc3_ = "red"; if (Players[0].Colr == "red") _loc3_ = "blue"`. */
+    private fun invertColr(colr: String): String = if (colr == "red") "blue" else "red"
 
     /**
      * Port of the end-game results: frame_101 (BestPlayers + WinnerText),
@@ -252,7 +342,13 @@ class Engine(
         sound.stopAll()
         phase = Phase.GAMESET
         standings = computeStandings()
-        gameOverText = "PLAYER ${standings.first().playerIndex + 1} WINS!"
+        // frame_101: endurance shows "{KilledPlayers} KILLS!"; versus shows
+        // "PLAYER {BestPlayers[0].Index + 1} WINS!" for stock and time.
+        gameOverText = if (gameType == "endurance") {
+            "$killedPlayers KILLS!"
+        } else {
+            "PLAYER ${standings.first().playerIndex + 1} WINS!"
+        }
     }
 
     /**
@@ -358,6 +454,9 @@ class Engine(
         gameOverText = gameOverText,
         standings = standings,
         limitMode = limitMode,
+        gameType = gameType,
+        killedPlayers = killedPlayers,
+        gameTimeSec = gameTime,
         nowMs = nowMs,
     )
 }

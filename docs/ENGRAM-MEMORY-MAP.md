@@ -24,6 +24,7 @@ memory by working directory; the entries below were created under project key
 | 215 | bugfix | `android/replica-scaffold` | 2026-10-19 | Crash countdown end: Fighter.world lateinit (5 revisions; upsert history collapsed) |
 | 216 | architecture | `port/fighter-core` | 2026-10-19 | Ported Fighter core from AS2 to Kotlin |
 | 217 | session_summary | — | 2026-10-19 | Session summary: fighter port |
+| 227 | architecture | `port/endurance-mode` | 2026-10-20 | Ported endurance wave mode (v0.3.0) |
 | 193–198, 201–203, 208–213 | session_summary | — | 2026-10-16 | Historical progress snapshots of the analysis phase |
 
 Full content of the substantive entries follows. Session summaries are progress
@@ -167,4 +168,7 @@ logs; retrieve any of them with `mem_get_observation(id)` when needed.
   `attachMovie("Star")` exists) — investigate the SWF timeline actions.
 - `ItemIndicator` (AS2 root-level marker above items, synced to visibility)
   is not ported — renderer has no equivalent; visual aid only.
-- Menus/endurance modes, sprite extraction, WiFi LAN multiplayer.
+- Menus (endurance is ported as a menu toggle in v0.3.0), sprite extraction,
+  WiFi LAN multiplayer.
+- Endurance assumes frame_51's decompiled truth; the SWF timeline actions that
+  could spawn the dormant Star item still need checking.

@@ -56,7 +56,12 @@ abstract class Fighter(
 ) : Body, ThrowSource {
 
     /** AS2 field `Weight`; exposed through [ThrowSource] for the Throw formula. */
-    override val weight: Float get() = stats.weight
+    /**
+     * Port of AS2 `Weight` (throw knockback mass). Starts at the
+     * [FighterStats] value; the first endurance wave overrides it to 0.1
+     * (the literal `GenerateEndurancePlayer` init arg `{Weight:0.1}`).
+     */
+    override var weight: Float = stats.weight
 
     // ------------------------------------------------------------------ position
     /** Feet-anchored world position (AS2 `_x`). */

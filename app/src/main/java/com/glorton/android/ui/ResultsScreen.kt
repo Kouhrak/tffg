@@ -32,9 +32,11 @@ import com.glorton.engine.GameSnapshot
  *  - stock: legend "Rank / (blank) / KOs / (blank) / Suicides" with
  *    "P{n} / Rank / (blank) / KOs / (blank) / SDs";
  *  - time: legend "Rank / KOs / Deaths / (blank) / Score" with
- *    "P{n} / Rank / +KOs / -Deaths / (blank) / Score".
+ *    "P{n} / Rank / +KOs / -Deaths / (blank) / Score";
+ *  - endurance: legend "Kills / (blank) / Deaths / (blank) / Time" with a
+ *    single P1 column; the clock is frame_170's GameTime as "M:SS"
+ *    (`Mins + ":" + (Secs >= 10 ? Secs : "0" + Secs)`).
  *
- * The endurance columns ("Kills/Deaths/Time") arrive with the endurance port.
  * The fighter name caption under each P-column is a port extension (the SWF
  * shows the fighter sprite on the podium instead, which needs extracted art).
  */
@@ -45,6 +47,7 @@ fun ResultsScreen(
 ) {
     val standings = snapshot?.standings.orEmpty()
     val limitMode = snapshot?.limitMode ?: "stock"
+    val isEndurance = snapshot?.gameType == "endurance"
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -58,18 +61,29 @@ fun ResultsScreen(
         )
         Spacer(modifier = Modifier.height(24.dp))
         Row(verticalAlignment = Alignment.Top) {
-            val legend = when (limitMode) {
-                "time" -> listOf("Rank", "KOs", "Deaths", "", "Score")
+            val legend = when {
+                isEndurance -> listOf("Kills", "", "Deaths", "", "Time")
+                limitMode == "time" -> listOf("Rank", "KOs", "Deaths", "", "Score")
                 else -> listOf("Rank", "", "KOs", "", "Suicides")
             }
             ResultColumn(header = null, fighterId = null, colr = null, cells = legend, isLegend = true)
-            standings.forEach { standing ->
+            // Endurance tracks only P1 against the CPU waves (frame_170 prints
+            // a single P1 column when Game.Type == "endurance").
+            val columns = if (isEndurance) standings.take(1) else standings
+            columns.forEach { standing ->
                 ResultColumn(
                     header = "P${standing.playerIndex + 1}",
                     fighterId = standing.fighterId,
                     colr = standing.colr,
-                    cells = when (limitMode) {
-                        "time" -> listOf(
+                    cells = when {
+                        isEndurance -> listOf(
+                            snapshot?.killedPlayers?.toString() ?: "0",
+                            "",
+                            standing.deaths.toString(),
+                            "",
+                            gameTimeClock(snapshot?.gameTimeSec ?: 0),
+                        )
+                        limitMode == "time" -> listOf(
                             standing.rank.toString(),
                             "+${standing.kos}",
                             "-${standing.deaths}",
@@ -93,6 +107,16 @@ fun ResultsScreen(
             Text(text = "CONTINUE")
         }
     }
+}
+
+/**
+ * frame_170's clock expression: `var Secs = GameTime % 60; var Mins =
+ * (GameTime - Secs) / 60` rendered as `Mins + ":" + (Secs >= 10 ? Secs : "0" + Secs)`.
+ */
+private fun gameTimeClock(gameTimeSec: Int): String {
+    val secs = gameTimeSec % 60
+    val mins = (gameTimeSec - secs) / 60
+    return "$mins:${if (secs >= 10) secs else "0$secs"}"
 }
 
 /** One table column: optional "P{n}" header with the player-color dot, then fixed-height cells. */

@@ -1,8 +1,10 @@
 package com.glorton.engine
 
+import com.glorton.engine.fighter.Fighter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -11,6 +13,13 @@ import org.junit.Test
  * [Fighter.die] (see Fighter.as:486-491 vs frame_101's `DeathOrd == undefined`).
  */
 class EngineResultsTest {
+
+    @Before
+    fun resetDeathOrder() {
+        // The elimination counter is static across the JVM; reset it so the
+        // assertions on deathOrd do not depend on test execution order.
+        Fighter.resetDeathOrder()
+    }
 
     private fun match(limitMode: String): Engine =
         GameFactory.rooftopMatch(

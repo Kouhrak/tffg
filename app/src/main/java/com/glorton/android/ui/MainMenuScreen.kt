@@ -27,11 +27,17 @@ import com.glorton.engine.GameFactory
  * The fighter row is a minimal stand-in for frame_46 character select: it
  * offers the ported roster ([GameFactory.ROSTER]) so every fighter can be
  * playtested; the real select screen (colors, both players) comes later.
+ *
+ * The mode row stands in for the original's mode buttons: "versus" is the
+ * regular match, "endurance" is the single-player wave mode started by
+ * DefineButton2_1006 (`Game.Type = "endurance"`).
  */
 @Composable
 fun MainMenuScreen(
     selectedFighterId: String,
     onSelectFighter: (String) -> Unit,
+    gameType: String,
+    onSelectGameType: (String) -> Unit,
     onPlay: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -55,6 +61,22 @@ fun MainMenuScreen(
             modifier = Modifier.padding(bottom = 32.dp),
         )
         Row(
+            modifier = Modifier.padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            listOf("versus" to "VERSUS", "endurance" to "ENDURANCE").forEach { (type, label) ->
+                if (type == gameType) {
+                    Button(onClick = { onSelectGameType(type) }) {
+                        Text(text = label)
+                    }
+                } else {
+                    OutlinedButton(onClick = { onSelectGameType(type) }) {
+                        Text(text = label, color = Color(0xFF90A4AE))
+                    }
+                }
+            }
+        }
+        Row(
             modifier = Modifier
                 .padding(bottom = 16.dp)
                 .horizontalScroll(rememberScrollState()),
@@ -77,7 +99,13 @@ fun MainMenuScreen(
             }
         }
         Button(onClick = onPlay) {
-            Text(text = "PLAY  (${selectedFighterId.removeSuffix("Player")} vs CPU - Rooftop)")
+            val pick = selectedFighterId.removeSuffix("Player")
+            Text(
+                text = when (gameType) {
+                    "endurance" -> "$pick  (endurance waves - Rooftop)"
+                    else -> "$pick  vs CPU - Rooftop"
+                },
+            )
         }
     }
 }

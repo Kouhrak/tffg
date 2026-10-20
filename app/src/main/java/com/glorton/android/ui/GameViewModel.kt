@@ -24,8 +24,14 @@ import kotlinx.coroutines.launch
 
 /** MVI intents of the game screen. */
 sealed interface GameIntent {
-    /** Starts a match with [fighterId] chosen by P1 on the menu. */
-    data class StartMatch(val fighterId: String = "DefaultPlayer") : GameIntent
+    /**
+     * Starts a match with [fighterId] chosen by P1 on the menu.
+     * [gameType] is the AS2 `Game.Type`: "versus" (default) or "endurance".
+     */
+    data class StartMatch(
+        val fighterId: String = "DefaultPlayer",
+        val gameType: String = "versus",
+    ) : GameIntent
     data object TogglePause : GameIntent
     data object ExitToMenu : GameIntent
     /** Shows the frame_170 results screen after GAME SET (navigation only). */
@@ -59,7 +65,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onIntent(intent: GameIntent) {
         when (intent) {
-            is GameIntent.StartMatch -> startMatch(intent.fighterId)
+            is GameIntent.StartMatch -> startMatch(intent.fighterId, intent.gameType)
             GameIntent.TogglePause -> togglePause()
             GameIntent.ExitToMenu -> exitToMenu()
             // Navigation-only: GlortonApp switches to the results screen; the
@@ -69,17 +75,19 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun startMatch(fighterId: String) {
+    private fun startMatch(fighterId: String, gameType: String) {
         stopLoop()
         // P1 picks the fighter on the menu; the CPU takes the first roster
         // entry that differs, so any pick can be playtested against variety
-        // (the original assigns both fighters in frame_46 select).
+        // (the original assigns both fighters in frame_46 select). Endurance
+        // takes P1 only - GameFactory spawns the CPU waves itself.
         val cpuFighterId = GameFactory.ROSTER.firstOrNull { it != fighterId } ?: fighterId
         val match = GameFactory.rooftopMatch(
             players = listOf(
                 PlayerSpec(fighterId = fighterId, colr = "red", team = "red", ai = false),
                 PlayerSpec(fighterId = cpuFighterId, colr = "blue", team = "blue", ai = true, aiLevel = 7f),
             ),
+            gameType = gameType,
             limitMode = "stock",
             limitVal = 3,
             sound = soundSink,
