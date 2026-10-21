@@ -10,6 +10,7 @@ import com.glorton.engine.fighter.PeachPlayer
 import com.glorton.engine.fighter.SBLPlayer
 import com.glorton.engine.fighter.TrashPlayer
 import com.glorton.engine.input.InputMapper
+import com.glorton.engine.select.GameType
 import com.glorton.engine.stages.RooftopStage
 import com.glorton.engine.world.World
 
@@ -32,8 +33,8 @@ object GameFactory {
 
     /**
      * Ported roster in frame_46 order: `Fighters = [SBL, Peach, Trash, Coffee,
-     * Default, Aubergine]`. Mirrors `createFighter`; used by the app to offer
-     * character selection before the full frame_46 menu is ported.
+     * Default, Aubergine]`. Mirrors [createFighter]; the frame_46 select screen
+     * (`com.glorton.engine.select.CharacterSelect`) offers exactly this list.
      */
     val ROSTER = listOf(
         "SBLPlayer",
@@ -50,15 +51,19 @@ object GameFactory {
         limitVal: Int = 3,
         /** AS2 Settings.ItemFrequency (frame_42 default 3; 0 disables item drops). */
         itemFrequency: Int = 3,
-        /** AS2 `Game.Type` (DefineButton2_1006 sets "endurance"). */
-        gameType: String = "versus",
+        /**
+         * AS2 `Game.Type` from the frame_46 mode buttons; see
+         * [com.glorton.engine.select.GameType] for the four ids.
+         */
+        gameType: String = GameType.ONE_ON_ONE,
         sound: SoundSink = NoopSoundSink,
     ): Engine {
-        // Endurance overrides the versus limit settings: the AS2 run ends on
-        // P1's first death through its sticky Dead flag, so the port models P1
-        // as a real one-stock elimination (documented in Fighter.die).
-        val matchLimitMode = if (gameType == "endurance") "stock" else limitMode
-        val matchLimitVal = if (gameType == "endurance") 1 else limitVal
+        // Endurance overrides the limit settings of every other mode: the AS2
+        // run ends on P1's first death through its sticky Dead flag, so the
+        // port models P1 as a real one-stock elimination (documented in
+        // Fighter.die).
+        val matchLimitMode = if (gameType == GameType.ENDURANCE) "stock" else limitMode
+        val matchLimitVal = if (gameType == GameType.ENDURANCE) 1 else limitVal
         val world: World = RooftopStage.create()
         val camera = VCamera().apply {
             boundsCam = world.camBounds
@@ -73,7 +78,7 @@ object GameFactory {
 
         // Endurance starts with P1 alone (frame_51 InitArea passes the single
         // Game.NumPlayers roster); the CPU wave comes from GenerateEndurancePlayer.
-        val specs = if (gameType == "endurance") players.take(1) else players
+        val specs = if (gameType == GameType.ENDURANCE) players.take(1) else players
         specs.forEachIndexed { index, spec ->
             // The original attaches players at SpawnP1..SpawnP4 (frame_51 InitArea).
             val spawn = world.spawnPoints["SpawnP${index + 1}"]
@@ -108,7 +113,7 @@ object GameFactory {
         // first CPU wave up front; later waves come from Engine's
         // regenerateEnemy through the factory below.
         var enemyFactory: (() -> Fighter)? = null
-        if (gameType == "endurance" && fighters.isNotEmpty()) {
+        if (gameType == GameType.ENDURANCE && fighters.isNotEmpty()) {
             val p1 = fighters.first()
             enemyFactory = { createEnduranceEnemy(sound) }
             val first = enemyFactory.invoke()

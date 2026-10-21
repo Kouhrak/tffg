@@ -5,6 +5,7 @@ import com.glorton.engine.camera.VCamera
 import com.glorton.engine.fighter.Fighter
 import com.glorton.engine.fighter.FighterState
 import com.glorton.engine.input.InputMapper
+import com.glorton.engine.select.GameType
 import com.glorton.engine.world.Platform
 import com.glorton.engine.world.World
 
@@ -86,8 +87,8 @@ data class GameSnapshot(
     val standings: List<StandingSnapshot> = emptyList(),
     /** `"stock"` or `"time"` - selects the frame_170 legend and columns. */
     val limitMode: String = "stock",
-    /** AS2 `Game.Type`: `"versus"` or `"endurance"`. */
-    val gameType: String = "versus",
+    /** AS2 `Game.Type`: see [com.glorton.engine.select.GameType]. */
+    val gameType: String = GameType.ONE_ON_ONE,
     /** frame_51 `KilledPlayers` - enemies defeated in an endurance run. */
     val killedPlayers: Int = 0,
     /** frame_51 `GameTime` - elapsed whole seconds (endurance results clock). */
@@ -123,8 +124,10 @@ data class StandingSnapshot(
  *    DoFighter then DoAI, which delays AI commands by one 25ms tick.
  *  - The AS2 loop `while (_loc1_ <= NPlayers)` had an off-by-one that also
  *    ticked a phantom player; the port iterates exactly the real fighters.
- *  - The menugame/tutorial attract flows are not ported yet; versus
- *    (stock/time) and endurance modes are.
+ *  - The menugame/tutorial attract flows are not ported yet; the `oneonone`
+ *    and `quick` modes (stock/time) plus `endurance` are. `vsmode` builds and
+ *    fights, but driving four humans needs a local multiplayer input mapping
+ *    that the app does not have yet (it feeds a single touch input).
  */
 class Engine(
     val world: World,
@@ -136,12 +139,15 @@ class Engine(
     private val inputMappers: List<InputMapper?>,
     /** frame_51 `ItemGen` cadence; null when the stage has no item spawn bars. */
     val itemGen: com.glorton.engine.item.ItemGen? = null,
-    /** AS2 `Game.Type`: `"versus"` (default) or `"endurance"`. */
-    val gameType: String = "versus",
+    /**
+     * AS2 `Game.Type`: see [GameType] (`oneonone`, `quick`, `endurance`; the
+     * fourth button, `vsmode`, is accepted but not drivable yet).
+     */
+    val gameType: String = GameType.ONE_ON_ONE,
     /**
      * Builds the next endurance wave's CPU fighter (AS2
      * GenerateEndurancePlayer's `Fighters[random(...)]` attachMovie); null in
-     * versus mode. Apply team/lives/colr after [Fighter.init].
+     * every other mode. Apply team/lives/colr after [Fighter.init].
      */
     private val enemyFactory: (() -> Fighter)? = null,
     val limitMode: String,
@@ -258,12 +264,14 @@ class Engine(
     }
 
     /**
-     * Port of PlayerDeath (frame_51): versus stock ends when all but one
-     * player are eliminated; endurance ends when P1 dies and regenerates the
-     * CPU wave otherwise (`GenerateEndurancePlayer`).
+     * Port of PlayerDeath (frame_51): in stock mode every mode but endurance
+     * ends when all but one player are eliminated (the AS2 `NumDead ==
+     * Players.length - 1` test, which deliberately misses a full simultaneous
+     * wipe - that quirk is ported as-is); endurance ends when P1 dies and
+     * regenerates the CPU wave otherwise (`GenerateEndurancePlayer`).
      */
     private fun checkDeaths() {
-        if (gameType == "endurance") {
+        if (gameType == GameType.ENDURANCE) {
             val p1 = fighters.first()
             if (p1.dead) {
                 endGame()
@@ -342,9 +350,9 @@ class Engine(
         sound.stopAll()
         phase = Phase.GAMESET
         standings = computeStandings()
-        // frame_101: endurance shows "{KilledPlayers} KILLS!"; versus shows
-        // "PLAYER {BestPlayers[0].Index + 1} WINS!" for stock and time.
-        gameOverText = if (gameType == "endurance") {
+        // frame_101: endurance shows "{KilledPlayers} KILLS!"; the stock and
+        // time modes show "PLAYER {BestPlayers[0].Index + 1} WINS!".
+        gameOverText = if (gameType == GameType.ENDURANCE) {
             "$killedPlayers KILLS!"
         } else {
             "PLAYER ${standings.first().playerIndex + 1} WINS!"
