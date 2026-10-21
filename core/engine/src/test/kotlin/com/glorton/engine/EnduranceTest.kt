@@ -23,7 +23,7 @@ class EnduranceTest {
     }
 
     private fun endurance(): Engine =
-        GameFactory.rooftopMatch(
+        GameFactory.match(
             players = listOf(PlayerSpec(fighterId = "DefaultPlayer", colr = "red", team = "red")),
             gameType = "endurance",
         )
@@ -111,7 +111,7 @@ class EnduranceTest {
 
     @Test
     fun `versus matches never regenerate the second player`() {
-        val engine = GameFactory.rooftopMatch(
+        val engine = GameFactory.match(
             players = listOf(
                 PlayerSpec(fighterId = "DefaultPlayer", colr = "red", team = "red"),
                 PlayerSpec(fighterId = "PeachPlayer", colr = "blue", team = "blue"),

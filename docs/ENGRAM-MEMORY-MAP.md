@@ -26,6 +26,7 @@ memory by working directory; the entries below were created under project key
 | 217 | session_summary | — | 2026-10-19 | Session summary: fighter port |
 | 227 | architecture | `port/endurance-mode` | 2026-10-20 | Ported endurance wave mode (v0.3.0) |
 | 228 | architecture | `port/player-select` | 2026-10-21 | Ported frame_46 character select (v0.4.0 + v0.5.0) |
+| 230 | architecture | `port/stage-select` | 2026-10-21 | Ported frame_47 stage select + all four stages (v0.6.0) |
 | 193–198, 201–203, 208–213 | session_summary | — | 2026-10-16 | Historical progress snapshots of the analysis phase |
 
 Full content of the substantive entries follows. Session summaries are progress
@@ -166,6 +167,44 @@ logs; retrieve any of them with `mem_get_observation(id)` when needed.
 
 ---
 
+## #230 — frame_47 stage select (analysis + port, v0.6.0)
+
+- `frame_47` is the frame labelled **"StageSelect"** (not frame_48: that one
+  just removes clips, stops menu music and `gotoAndStop("Game")`).
+- `SelectStage(StageName)` writes `Game.Level = StageName` and goes to
+  `"GameLoad"`; the thumbnails are placed with
+  `xP = (i <= 2 ? i : i - 3) * 550 / 3 + 30`, `yP = i > 2 ? 210 : 90` — a
+  3-wide grid on the 600x400 stage that wraps to a second row, left aligned.
+- frame_42 `Stages = ["Rooftop","Mogadishu","B52","Space"]` is the single
+  source of truth: it orders the thumbs, becomes `Game.Level`, drives frame_51's
+  `Bounds` switch **and** is the looped music key (`Snd.PlaySound(Game.Level,
+  true)`). The port keeps that naming contract end to end.
+- frame_47's `Game.Rand.Level` random-stage branch is **dead code**: the mode
+  buttons only ever write `Game.Rand.CP`, nothing sets `Rand.Level`. The port
+  always shows the thumbnails.
+- AS2 quirk: line 23 calls `StageThum.getNextHighestDepth()` (missing `b`);
+  `StageThum` appears nowhere else in the decompiled scripts, so it is almost
+  certainly a stray timeline instance name. It only feeds a depth counter.
+- `StageThumb` (DefineSprite_824): `stop()`, `onRollOver`/`onRollOut` switch to
+  frame 2/1 (hover art), `onRelease` → `_parent.SelectStage(this.StageName)`.
+- **Gotcha:** the JPEXS PNG exports cannot yield world coordinates. They are
+  bounding-box exports with no recorded offset into Flash space, the stage
+  sprites are animated (Rooftop 408 frames, B52 170), and the art overflows the
+  world rect badly (B52 art is 7491x887 px for a 1200x700 world). Calibrating
+  the shipped Rooftop approximation against its own art disproves a uniform
+  mapping (upper/floor width ratio 0.69 in art vs 0.19 shipped). So the
+  established pattern stands: hand-designed plausible geometry + **real**
+  `Bounds`/`BoundsCam` + **real** music, documented per stage.
+- Safety net instead of pixel archaeology: `StageCatalogTest` asserts every
+  stage has `SpawnP1..P4` inside the real world bounds, each dropping onto a
+  platform top, and that platforms/item bars stay inside bounds.
+- Thumbnails *are* usable as-is: `DefineSprite_718/835/879/905_*_Thumb` are
+  single ~150x100 PNGs copied to `app/src/main/assets/stages/{id}.png`.
+- `GameFactory.rooftopMatch` → `GameFactory.match(players, ..., stage)`: the old
+  name became a lie once stages multiplied (5 call sites updated).
+
+---
+
 ## Integration decisions made after #216 (not stored in Engram individually)
 
 - `ThrowSource` interface (`fighter/ThrowSource.kt`, weight only): `Fighter`
@@ -188,9 +227,14 @@ logs; retrieve any of them with `mem_get_observation(id)` when needed.
 ## Known pending items
 
 - User-reported controller/touch issues (details pending) — next session topic.
-- Rooftop platform geometry in `RooftopStage.kt` is an approximation; real
-  geometry lives in the SWF sprite `DefineSprite_726_Rooftop` (SpawnH1..4 item
-  bars are approximations too, see `RooftopStage.itemSpawns`).
+- Stage platform geometry is an approximation in **all four** stages
+  (`RooftopStage`, `MogadishuStage`, `B52Stage`, `SpaceStage`); the real
+  rectangles live in the SWF sprites `DefineSprite_726/832/873/886`, and the
+  SpawnH1..4 item bars are approximations too (see each `itemSpawns`). What is
+  real, and asserted by `StageCatalogTest`, is the frame_51 `Bounds`/`BoundsCam`
+  per stage plus the spawn-above-a-platform playability rule. PNG bbox offsets
+  are **not** recoverable from the JPEXS export, so the art cannot be used to
+  derive world coordinates yet (see #230).
 - Sounds `Fart.wav` and `PeachRocket.wav` exported by JPEXS as Flash-ADPCM FLV,
   not convertible here (no ffmpeg available); Fart falls back to Fart2, and
   "Rocket" (Peach's up-special, now ported) still plays silently in
@@ -200,15 +244,16 @@ logs; retrieve any of them with `mem_get_observation(id)` when needed.
   `attachMovie("Star")` exists) — investigate the SWF timeline actions.
 - `ItemIndicator` (AS2 root-level marker above items, synced to visibility)
   is not ported — renderer has no equivalent; visual aid only.
-- Menus: the mode menu and the frame_46 player select are ported (v0.4.0
-  model, v0.5.0 screen); still missing are stage select (frame_47/48) and the
-  menugame/tutorial attract flows. The stage is fixed to Rooftop.
+- Menus: the mode menu, the frame_46 player select and the frame_47 stage
+  select are ported (v0.4.0/v0.5.0 select, v0.6.0 stage select); still missing
+  are the menugame/tutorial attract flows.
 - `vsmode` (4 humans) is listed on the menu but its PLAY button is disabled: the
   app feeds a single touch input into `Engine.tick`, which indexes `inputs` by
   **fighter slot** (every reachable mode keeps the one human in slot 0, so both
   indexings agree today), while AS2 binds keys per human (`Keys[P]`). That
   mapping has to become "human ordinal" before local multiplayer works.
-- Sprite extraction (fighter-select poses, results podium), WiFi LAN
-  multiplayer.
+- Sprite extraction (fighter-select poses, results podium, stage *backdrops* —
+  the four stage thumbnails are already in `app/src/main/assets/stages/`),
+  WiFi LAN multiplayer.
 - Endurance assumes frame_51's decompiled truth; the SWF timeline actions that
   could spawn the dormant Star item still need checking.

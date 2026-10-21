@@ -22,7 +22,7 @@ class EngineResultsTest {
     }
 
     private fun match(limitMode: String): Engine =
-        GameFactory.rooftopMatch(
+        GameFactory.match(
             players = listOf(
                 PlayerSpec(fighterId = "DefaultPlayer", colr = "red", team = "red"),
                 PlayerSpec(fighterId = "PeachPlayer", colr = "blue", team = "blue"),

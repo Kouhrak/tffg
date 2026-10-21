@@ -11,12 +11,13 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.glorton.engine.select.CharacterSelect
 import com.glorton.engine.select.GameType
+import com.glorton.engine.stages.STAGES
 
-private enum class AppScreen { MENU, SELECT, GAME, RESULTS }
+private enum class AppScreen { MENU, SELECT, STAGE_SELECT, GAME, RESULTS }
 
 /**
  * Root composable: navigation between the frame_42 mode menu, the frame_46
- * player select, the game and the frame_170 results.
+ * player select, the frame_47 stage select, the game and the frame_170 results.
  */
 @Composable
 fun GlortonApp() {
@@ -27,6 +28,10 @@ fun GlortonApp() {
         // frame_46's Players[] state. Rebuilt every time the screen opens,
         // which is when AS2 re-attaches the boxes and re-rolls the CPU fighters.
         var selectState by remember { mutableStateOf(CharacterSelect.create(GameType.ONE_ON_ONE)) }
+        // AS2 Game.Level. frame_42 boots it to a random Stages entry, but
+        // SelectStage always overwrites it, so pre-selecting the first thumb
+        // (Rooftop) only decides what FIGHT would start right now.
+        var selectedStage by remember { mutableStateOf(STAGES.first()) }
         val gameViewModel: GameViewModel = viewModel()
         val gameState by gameViewModel.uiState.collectAsState()
 
@@ -50,13 +55,23 @@ fun GlortonApp() {
                     selectState = selectState.adjustAiLevel(index, delta)
                 },
                 onBack = { screen = AppScreen.MENU },
+                // frame_46's gotoStageSelect() lands on the frame_47 stage
+                // picker; the roster is only handed to the match afterwards.
+                onPlay = { screen = AppScreen.STAGE_SELECT },
+            )
+            AppScreen.STAGE_SELECT -> StageSelectScreen(
+                stage = selectedStage,
+                onSelectStage = { selectedStage = it },
+                onBack = { screen = AppScreen.SELECT },
                 onPlay = {
+                    // frame_47 SelectStage() -> frame_51 InitArea.
                     val players = selectState.confirm()
                     if (players != null) {
                         gameViewModel.onIntent(
                             GameIntent.StartMatch(
                                 gameType = selectedGameType,
                                 players = players,
+                                stage = selectedStage,
                             ),
                         )
                         screen = AppScreen.GAME

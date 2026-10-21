@@ -11,7 +11,7 @@ import com.glorton.engine.fighter.SBLPlayer
 import com.glorton.engine.fighter.TrashPlayer
 import com.glorton.engine.input.InputMapper
 import com.glorton.engine.select.GameType
-import com.glorton.engine.stages.RooftopStage
+import com.glorton.engine.stages.createStage
 import com.glorton.engine.world.World
 
 /** Declarative description of one slot of the match. */
@@ -26,8 +26,9 @@ data class PlayerSpec(
 )
 
 /**
- * Builds playable matches. V1 wires the Rooftop stage with DefaultPlayer
- * fighters; more characters and stages are ported later.
+ * Builds playable matches from a frame_46 roster and a frame_47 stage pick.
+ * The class KDoc of each stage records which parts are real AS2 data
+ * (bounds/camera/music) and which are approximations (platform rectangles).
  */
 object GameFactory {
 
@@ -45,7 +46,10 @@ object GameFactory {
         "AuberginePlayer",
     )
 
-    fun rooftopMatch(
+    /**
+     * Builds a match on [stage] (one of [com.glorton.engine.stages.STAGES]).
+     */
+    fun match(
         players: List<PlayerSpec>,
         limitMode: String = "stock",
         limitVal: Int = 3,
@@ -56,6 +60,8 @@ object GameFactory {
          * [com.glorton.engine.select.GameType] for the four ids.
          */
         gameType: String = GameType.ONE_ON_ONE,
+        /** AS2 `Game.Level`, picked on frame_47; see [com.glorton.engine.stages.STAGES]. */
+        stage: String = "Rooftop",
         sound: SoundSink = NoopSoundSink,
     ): Engine {
         // Endurance overrides the limit settings of every other mode: the AS2
@@ -64,7 +70,7 @@ object GameFactory {
         // Fighter.die).
         val matchLimitMode = if (gameType == GameType.ENDURANCE) "stock" else limitMode
         val matchLimitVal = if (gameType == GameType.ENDURANCE) 1 else limitVal
-        val world: World = RooftopStage.create()
+        val world: World = createStage(stage)
         val camera = VCamera().apply {
             boundsCam = world.camBounds
         }
@@ -147,8 +153,9 @@ object GameFactory {
         camera.init()
         world.camera = camera
 
-        // frame_51: Snd.PlaySound(Game.Level, true) — looped stage music.
-        sound.play("Rooftop", loop = true)
+        // frame_51: Snd.PlaySound(Game.Level, true) - looped stage music, keyed
+        // by the stage id itself (see com.glorton.engine.stages.STAGES).
+        sound.play(stage, loop = true)
 
         // frame_51 InitArea: ItemGen.init([Mine,Grenade], Settings.ItemFrequency).
         val itemGen = com.glorton.engine.item.ItemGen(world = world, frequency = itemFrequency)

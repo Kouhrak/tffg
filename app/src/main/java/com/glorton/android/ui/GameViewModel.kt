@@ -26,13 +26,15 @@ import kotlinx.coroutines.launch
 /** MVI intents of the game screen. */
 sealed interface GameIntent {
     /**
-     * Starts the frame_51 match from the frame_46 select result.
-     * [gameType] is the AS2 `Game.Type`; [players] is what
-     * `CharacterSelect.confirm()` produced (only the slots that can fight).
+     * Starts the frame_51 match from the frame_46/47 select result.
+     * [gameType] is the AS2 `Game.Type`; [stage] is the AS2 `Game.Level` picked
+     * on frame_47; [players] is what `CharacterSelect.confirm()` produced
+     * (only the slots that can fight).
      */
     data class StartMatch(
         val gameType: String = GameType.ONE_ON_ONE,
         val players: List<PlayerSpec> = emptyList(),
+        val stage: String = "Rooftop",
     ) : GameIntent
     data object TogglePause : GameIntent
     data object ExitToMenu : GameIntent
@@ -67,7 +69,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onIntent(intent: GameIntent) {
         when (intent) {
-            is GameIntent.StartMatch -> startMatch(intent.gameType, intent.players)
+            is GameIntent.StartMatch ->
+                startMatch(intent.gameType, intent.players, intent.stage)
             GameIntent.TogglePause -> togglePause()
             GameIntent.ExitToMenu -> exitToMenu()
             // Navigation-only: GlortonApp switches to the results screen; the
@@ -77,15 +80,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun startMatch(gameType: String, players: List<PlayerSpec>) {
+    private fun startMatch(gameType: String, players: List<PlayerSpec>, stage: String) {
         // The select screen refuses to start an empty roster (frame_46's
         // `return undefined`); keep the guard so a stray intent cannot build a
         // match nobody can fight.
         if (players.isEmpty()) return
         stopLoop()
-        val match = GameFactory.rooftopMatch(
+        val match = GameFactory.match(
             players = players,
             gameType = gameType,
+            stage = stage,
             limitMode = "stock",
             limitVal = 3,
             sound = soundSink,
