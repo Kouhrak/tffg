@@ -1,15 +1,13 @@
 package com.glorton.android.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,30 +15,31 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.glorton.engine.GameFactory
+import com.glorton.engine.select.GameType
 
 /**
- * PAGE: main menu (v1). The original boots into a "menugame" attract mode
- * (frame_42 sets Game.Type = "menugame"); the full menu flow with character
- * and stage select is ported in a later slice.
+ * PAGE: the mode menu - frame_42's `Game.Type = "menugame"` attract screen,
+ * where the four buttons below PlayerSelect live.
  *
- * The fighter row is a minimal stand-in for frame_46 character select: it
- * offers the ported roster ([GameFactory.ROSTER]) so every fighter can be
- * playtested; the real select screen (colors, both players) comes later.
+ * Each entry keeps the AS2 rollover copy verbatim (the `Hit.text` assignments
+ * in DefineButton2_1011/1016/1022/1006); a mouse rolls over a button, a finger
+ * cannot, so the port shows the hint of the mode the user currently has
+ * selected instead.
  *
- * The mode row stands in for the original's mode buttons: "versus" is the
- * regular match, "endurance" is the single-player wave mode started by
- * DefineButton2_1006 (`Game.Type = "endurance"`).
+ * `vsmode` (DefineButton2_1022, "every man for himself") is selectable so its
+ * copy is readable, but PLAY stays disabled for it: driving four humans needs a
+ * local multiplayer input mapping the app does not have yet (GameViewModel
+ * feeds a single touch input into Engine.tick).
  */
 @Composable
 fun MainMenuScreen(
-    selectedFighterId: String,
-    onSelectFighter: (String) -> Unit,
     gameType: String,
     onSelectGameType: (String) -> Unit,
     onPlay: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val selected = MODE_BUTTONS.firstOrNull { it.id == gameType } ?: MODE_BUTTONS.first()
+    val playEnabled = gameType != GameType.VS_MODE
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -60,52 +59,78 @@ fun MainMenuScreen(
             color = Color(0xFF90A4AE),
             modifier = Modifier.padding(bottom = 32.dp),
         )
-        Row(
-            modifier = Modifier.padding(bottom = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            listOf("versus" to "VERSUS", "endurance" to "ENDURANCE").forEach { (type, label) ->
-                if (type == gameType) {
-                    Button(onClick = { onSelectGameType(type) }) {
-                        Text(text = label)
-                    }
-                } else {
-                    OutlinedButton(onClick = { onSelectGameType(type) }) {
-                        Text(text = label, color = Color(0xFF90A4AE))
-                    }
+        MODE_BUTTONS.forEach { mode ->
+            val isSelected = mode.id == gameType
+            if (isSelected) {
+                Button(
+                    onClick = { onSelectGameType(mode.id) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                ) {
+                    Text(text = mode.label)
+                }
+            } else {
+                OutlinedButton(
+                    onClick = { onSelectGameType(mode.id) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                ) {
+                    Text(text = mode.label, color = Color(0xFF90A4AE))
                 }
             }
         }
-        Row(
-            modifier = Modifier
-                .padding(bottom = 16.dp)
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            GameFactory.ROSTER.forEach { fighterId ->
-                val selected = fighterId == selectedFighterId
-                if (selected) {
-                    Button(onClick = { onSelectFighter(fighterId) }) {
-                        Text(text = fighterId.removeSuffix("Player"))
-                    }
-                } else {
-                    OutlinedButton(onClick = { onSelectFighter(fighterId) }) {
-                        Text(
-                            text = fighterId.removeSuffix("Player"),
-                            color = Color(0xFF90A4AE),
-                        )
-                    }
-                }
-            }
+        Text(
+            text = selected.hint,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color(0xFF90A4AE),
+            modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
+        )
+        Button(onClick = onPlay, enabled = playEnabled) {
+            Text(text = "SELECT FIGHTER")
         }
-        Button(onClick = onPlay) {
-            val pick = selectedFighterId.removeSuffix("Player")
+        if (!playEnabled) {
             Text(
-                text = when (gameType) {
-                    "endurance" -> "$pick  (endurance waves - Rooftop)"
-                    else -> "$pick  vs CPU - Rooftop"
-                },
+                text = "4 PLAYERS needs local multiplayer input (pending)",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF607D8B),
+                modifier = Modifier.padding(top = 8.dp),
             )
         }
     }
 }
+
+/** One AS2 mode button: id (`Game.Type`), label and its verbatim rollover copy. */
+private data class ModeButton(
+    val id: String,
+    val label: String,
+    val hint: String,
+)
+
+private val MODE_BUTTONS = listOf(
+    ModeButton(
+        id = GameType.ONE_ON_ONE,
+        label = "1 VS 1",
+        hint = "Play against only one fighter.",
+    ),
+    ModeButton(
+        id = GameType.QUICK,
+        label = "QUICK",
+        hint = "Want to play right now? Just choose a fighter and you're ready to fight!",
+    ),
+    ModeButton(
+        id = GameType.VS_MODE,
+        label = "4 PLAYERS",
+        hint = "The classical mode: every man for himself!",
+    ),
+    ModeButton(
+        id = GameType.ENDURANCE,
+        label = "ENDURANCE",
+        hint = "How long can you last against a never ending flow of enemies?",
+    ),
+)
+
+/** Human label of an AS2 `Game.Type`; the select screen shows it as its header. */
+internal fun gameTypeLabel(gameType: String): String =
+    MODE_BUTTONS.firstOrNull { it.id == gameType }?.label ?: gameType.uppercase()

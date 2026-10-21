@@ -25,6 +25,7 @@ memory by working directory; the entries below were created under project key
 | 216 | architecture | `port/fighter-core` | 2026-10-19 | Ported Fighter core from AS2 to Kotlin |
 | 217 | session_summary | — | 2026-10-19 | Session summary: fighter port |
 | 227 | architecture | `port/endurance-mode` | 2026-10-20 | Ported endurance wave mode (v0.3.0) |
+| 228 | architecture | `port/player-select` | 2026-10-21 | Ported frame_46 character select (v0.4.0 + v0.5.0) |
 | 193–198, 201–203, 208–213 | session_summary | — | 2026-10-16 | Historical progress snapshots of the analysis phase |
 
 Full content of the substantive entries follows. Session summaries are progress
@@ -134,6 +135,37 @@ logs; retrieve any of them with `mem_get_observation(id)` when needed.
 
 ---
 
+## #228 — frame_46 character select (analysis + port, v0.4.0/v0.5.0)
+
+- Real `Game.Type` ids: `oneonone | quick | vsmode | endurance | menugame` —
+  the port's invented `"versus"` is gone; constants live in
+  `com.glorton.engine.select.GameType`.
+- The four mode buttons define the slot layout: 1011 `oneonone` NumGamers 1 /
+  NumPlayers 2 / `Rand.CP 1`; 1016 `quick` 1 / 4 / `Rand.CP 3`; 1022 `vsmode`
+  4 / 4 (`Game.Rand` undefined); 1006 `endurance` 1 / 1.
+- frame_46 geometry: FighterBox `x = i*94+6, y = 70`; PlayerPoseBox
+  `x = i*(550/N)+25, y = 188, Team = Colors[i]`; PlayerCoin `x = i*32+30,
+  y = 50` frame `Colors[i]`; every slot starts `Level = 7`; CPU slots roll
+  `Fighters[random(n)]` only when `Game.Rand != undefined`.
+- `SelectFighter` stores the fighter and then runs `SetColor(slot, 0)`: it skips
+  any color another player already holds **with the same fighter** (different
+  fighters may both be red). `Team` comes from the slot *position*, `Colr` is
+  derived — they can differ.
+- `gotoStageSelect` drops slots that never picked, but pushes `Team` from the
+  *original* slot index; frame_51 then compacts the enabled ones. An unpicked P1
+  therefore shifts the CPU into `Players[0]` while it keeps team `blue`.
+- AISetter = DefineButton2_804 (`-`) / 805 (`+`), clamp 1..20; PlayerPoseBox
+  Toggle cycles P -> CP -> Disabled but bails out when `Game.Mode == "single"`
+  (the only mode this port drives).
+- Port deviations: `CharacterSelect.armedSlot` replaces dragging PlayerCoin over
+  a FighterBox (touch has no cursor), and `confirm()` returns null instead of
+  navigating into a match with an empty roster (AS2 gates on *picked* slots).
+- Gotcha that broke the first test run: in `oneonone` the CPU roll pre-claims
+  `red` with `SBLPlayer`, so P1's SetColor starts at `blue` — color tests must
+  use `vsmode` (no `Game.Rand`) or inject another roll.
+
+---
+
 ## Integration decisions made after #216 (not stored in Engram individually)
 
 - `ThrowSource` interface (`fighter/ThrowSource.kt`, weight only): `Fighter`
@@ -168,7 +200,15 @@ logs; retrieve any of them with `mem_get_observation(id)` when needed.
   `attachMovie("Star")` exists) — investigate the SWF timeline actions.
 - `ItemIndicator` (AS2 root-level marker above items, synced to visibility)
   is not ported — renderer has no equivalent; visual aid only.
-- Menus (endurance is ported as a menu toggle in v0.3.0), sprite extraction,
-  WiFi LAN multiplayer.
+- Menus: the mode menu and the frame_46 player select are ported (v0.4.0
+  model, v0.5.0 screen); still missing are stage select (frame_47/48) and the
+  menugame/tutorial attract flows. The stage is fixed to Rooftop.
+- `vsmode` (4 humans) is listed on the menu but its PLAY button is disabled: the
+  app feeds a single touch input into `Engine.tick`, which indexes `inputs` by
+  **fighter slot** (every reachable mode keeps the one human in slot 0, so both
+  indexings agree today), while AS2 binds keys per human (`Keys[P]`). That
+  mapping has to become "human ordinal" before local multiplayer works.
+- Sprite extraction (fighter-select poses, results podium), WiFi LAN
+  multiplayer.
 - Endurance assumes frame_51's decompiled truth; the SWF timeline actions that
   could spawn the dormant Star item still need checking.

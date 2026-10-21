@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.glorton.engine.GameSnapshot
+import com.glorton.engine.select.GameType
 
 /**
  * Port of the end-of-match results scene: frame_101's WinnerText on top and
@@ -47,7 +48,7 @@ fun ResultsScreen(
 ) {
     val standings = snapshot?.standings.orEmpty()
     val limitMode = snapshot?.limitMode ?: "stock"
-    val isEndurance = snapshot?.gameType == "endurance"
+    val isEndurance = snapshot?.gameType == GameType.ENDURANCE
     Column(
         modifier = Modifier
             .fillMaxSize()

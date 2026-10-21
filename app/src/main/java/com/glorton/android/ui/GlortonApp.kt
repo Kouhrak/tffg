@@ -9,34 +9,58 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.glorton.engine.select.CharacterSelect
+import com.glorton.engine.select.GameType
 
-private enum class AppScreen { MENU, GAME, RESULTS }
+private enum class AppScreen { MENU, SELECT, GAME, RESULTS }
 
-/** Root composable: navigation between the menu, the game and the results. */
+/**
+ * Root composable: navigation between the frame_42 mode menu, the frame_46
+ * player select, the game and the frame_170 results.
+ */
 @Composable
 fun GlortonApp() {
     MaterialTheme(colorScheme = darkColorScheme()) {
         var screen by remember { mutableStateOf(AppScreen.MENU) }
-        var selectedFighterId by remember { mutableStateOf("DefaultPlayer") }
-        // AS2 Game.Type: "versus" (default) or "endurance" (DefineButton2_1006).
-        var selectedGameType by remember { mutableStateOf("versus") }
+        // AS2 Game.Type, chosen by the four buttons above PlayerSelect.
+        var selectedGameType by remember { mutableStateOf(GameType.ONE_ON_ONE) }
+        // frame_46's Players[] state. Rebuilt every time the screen opens,
+        // which is when AS2 re-attaches the boxes and re-rolls the CPU fighters.
+        var selectState by remember { mutableStateOf(CharacterSelect.create(GameType.ONE_ON_ONE)) }
         val gameViewModel: GameViewModel = viewModel()
         val gameState by gameViewModel.uiState.collectAsState()
 
         when (screen) {
             AppScreen.MENU -> MainMenuScreen(
-                selectedFighterId = selectedFighterId,
-                onSelectFighter = { selectedFighterId = it },
                 gameType = selectedGameType,
                 onSelectGameType = { selectedGameType = it },
                 onPlay = {
-                    gameViewModel.onIntent(
-                        GameIntent.StartMatch(
-                            fighterId = selectedFighterId,
-                            gameType = selectedGameType,
-                        ),
-                    )
-                    screen = AppScreen.GAME
+                    selectState = CharacterSelect.create(selectedGameType)
+                    screen = AppScreen.SELECT
+                },
+            )
+            AppScreen.SELECT -> PlayerSelectScreen(
+                gameType = selectedGameType,
+                select = selectState,
+                onSelectFighter = { fighterId ->
+                    selectState = selectState.selectFighter(fighterId)
+                },
+                onArmSlot = { index -> selectState = selectState.armSlot(index) },
+                onAdjustAiLevel = { index, delta ->
+                    selectState = selectState.adjustAiLevel(index, delta)
+                },
+                onBack = { screen = AppScreen.MENU },
+                onPlay = {
+                    val players = selectState.confirm()
+                    if (players != null) {
+                        gameViewModel.onIntent(
+                            GameIntent.StartMatch(
+                                gameType = selectedGameType,
+                                players = players,
+                            ),
+                        )
+                        screen = AppScreen.GAME
+                    }
                 },
             )
             AppScreen.GAME -> {
